@@ -1,0 +1,11 @@
+{
+  "name": "Prometheus",
+  "type": "prometheus",
+  "access": "proxy",
+  "url": "http://prometheus:9090",
+  "isDefault": true,
+  "isRunning": false,
+  "editable": true,
+  "schemaVersion": 3,
+  "credentials": []
+}
