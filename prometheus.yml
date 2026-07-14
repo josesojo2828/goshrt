@@ -5,7 +5,3 @@ scrape_configs:
   - job_name: 'goshrt'
     static_configs:
       - targets: ['goshrt:8080']
-
-  - job_name: 'proxi-pulse'
-    static_configs:
-      - targets: ['proxi-pulse:8081']

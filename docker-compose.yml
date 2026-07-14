@@ -70,23 +70,6 @@ services:
     networks:
       - goshrt-network
 
-  # Proxi-pulse (placeholder - build/push your own image)
-  proxi-pulse:
-    image: ghcr.io/yourusername/proxi-pulse:latest
-    container_name: proxi_pulse
-    build:
-      context: ./proxi-pulse
-      dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
-    environment:
-      PROXI_PORT: "8081"
-      MAXMIND_DB_PATH: "/opt/proxi-pulse/GeoLite2-Country.mmdb"
-    volumes:
-      - ./proxi-pulse/GeoLite2-Country.mmdb:/opt/proxi-pulse/GeoLite2-Country.mmdb:ro
-    networks:
-      - goshrt-network
-
 networks:
   goshrt-network:
     driver: bridge
