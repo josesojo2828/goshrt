@@ -72,7 +72,7 @@ func (s *Service) CreateURL(ctx context.Context, originalURL string, customAlias
 
 	const maxRetries = 3
 	for i := 0; i < maxRetries; i++ {
-		if i > 0 {
+		if i > 0 && customAlias == "" {
 			code, err := store.GenerateShortCode(6)
 			if err != nil {
 				return nil, fmt.Errorf("generating short code on retry: %w", err)

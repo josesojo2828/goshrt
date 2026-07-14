@@ -1,218 +1,120 @@
 # goshrt ⚡
 
-**Acortador de URLs ultrarrápido, observable y listo para producción.**
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io)
+[![Prometheus](https://img.shields.io/badge/Metrics-Prometheus-E6522C?logo=prometheus)](https://prometheus.io)
+[![Grafana](https://img.shields.io/badge/Dashboard-Grafana-F46800?logo=grafana)](https://grafana.com)
 
-Go + PostgreSQL + Redis + Prometheus + Grafana — todo en un `docker-compose.yml`.
+**Acortador de URLs** con caché Redis, métricas Prometheus y dashboard Grafana. Pensado para autohosting — rápido, liviano y con todo el stack de monitoreo incluido.
 
----
+## Features
 
-## 🎯 **¿Qué hace?**
+- ⚡ **Cache-first**: Las URLs se sirven desde Redis, no desde PostgreSQL
+- 🔗 **Links temporales**: TTL configurable por URL (expiran automáticamente)
+- 📊 **Métricas**: Prometheus + Grafana dashboard pre-configurado
+- 📦 **Seed YAML**: Cargá URLs desde un archivo YAML al iniciar
+- 🐳 **Docker Compose**: Stack completo (app + postgres + redis + prometheus + grafana)
+- 🔄 **Click tracking**: Contador de clics sincronizado asincrónicamente
 
-- Acorta URLs con **alias personalizado** o **código aleatorio base62 (6 chars = 56B combinaciones)**.
-- **TTL opcional** para links temporales.
-- **Cache-first**: Redis para redirecciones casi instantáneas (~sub-ms).
-- **Persistencia real**: PostgreSQL como *source of truth*.
-- **Métricas Prometheus** out-of-the-box + **dashboard Grafana** listo.
-- **Seed por configuración**: carga URLs/DNS desde YAML al arranque.
-- **Arquitectura limpia**: handlers → service → store (PostgreSQL/Redis interfaces).
-
----
-
-## 📊 **Stack técnico**
+## Stack
 
 | Capa | Tecnología |
-|-------|------------|
-| **Lenguaje** | Go 1.25+ |
-| **Base de datos** | PostgreSQL 16 (source of truth) |
-| **Cache** | Redis 7 (cache L1) |
-| **Monitoring** | Prometheus + Grafana |
-| **Router** | chi/v5 |
-| **Deployment** | Docker + docker-compose |
+|------|-----------|
+| Router | chi/v5 |
+| Store | PostgreSQL (pgx/v5) |
+| Cache | Redis (go-redis/redis) |
+| Métricas | prometheus/client_golang |
+| Dashboard | Grafana (pre-provisionado) |
 
----
-
-## 🚀 **Quick Start (30 segundos)**
+## Quick Start
 
 ```bash
-# 1. Clonar y entrar
-git clone https://github.com/tuusuario/goshrt.git
-cd goshrt
-
-# 2. Crear volúmenes reutilizables (una sola vez)
-docker volume create goshrt_seed
-docker volume create goshrt_config
-
-# 3. Cargar tus URLs/DNS al volumen de seed
-docker run --rm \
-  -v goshrt_seed:/seed \
-  -v $(pwd)/config:/host_config \
-  alpine sh -c "cp /host_config/urls.yaml /seed/"
-
-# 4. Levantar TODO el stack
-docker-compose up -d
-
-# 5. Verificar
-curl http://localhost:8080/health
-# {"status":"ok"}
-
-# 6. Abrir Grafana
-open http://localhost:3000
-# user: admin | pass: ysecreto123
+cp .env.example .env  # o configurar vars de entorno
+docker compose up -d
 ```
 
----
+### Servicios
 
-## 📁 **Configuración del Seed**
+| Puerto | Servicio |
+|--------|----------|
+| :8080 | goshrt API |
+| :5432 | PostgreSQL |
+| :6379 | Redis |
+| :9090 | Prometheus |
+| :3000 | Grafana (admin:admin) |
 
-Presurta URLs y DNS desde `config/urls.yaml` al volumen `goshrt_seed`:
+## API
 
-```yaml
-# config/urls.yaml (ejemplo)
-urls:
-  - short_code: "google"
-    original_url: "https://google.com"
-    ttl: 0
-  - short_code: "github"
-    original_url: "https://github.com/tuusuario"
-  - short_code: "promo-verano"
-    original_url: "https://tienda.com/promo-verano-2025"
-    ttl: 2592000
-
-dns:
-  - name: "api.local"
-    target: "http://host.docker.internal:8080/api"
-```
-
-> **Tip:** El archivo se monta **read-only** en `/seed/urls.yaml` dentro del contenedor. Cambiá el archivo en el host y hacé `docker-compose restart goshrt` para recargar.
-
----
-
-## 🔌 **API Endpoints**
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `POST` | `/api/url` | Crear URL corta |
-| `GET` | `/{shortCode}` | Redirigir (301) |
-| `GET` | `/api/url/{shortCode}/stats` | Stats de una URL |
-| `GET` | `/api/urls` | Listar URLs (paginado) |
-| `DELETE` | `/api/url/{shortCode}` | Eliminar (soft delete) |
-| `GET` | `/health` | Health check simple |
-| `GET` | `/metrics` | Prometheus metrics |
-
-### **Ejemplos**
+### Crear URL corta
 
 ```bash
-# Crear URL
 curl -X POST http://localhost:8080/api/url \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://ejemplo.com","custom_alias":"mi-link","ttl_seconds":86400}'
+  -d '{"url": "https://ejemplo.com/muy/larga/ruta"}'
 
-# Response
-{
-  "short_code": "mi-link",
-  "original_url": "https://ejemplo.com",
-  "created_at": "2026-07-14T10:30:00Z"
-}
-
-# Redirigir
-curl -I http://localhost:8080/mi-link
-# HTTP/1.1 301 Moved Permanently
-# Location: https://ejemplo.com
-
-# Stats
-curl http://localhost:8080/api/url/mi-link/stats
-
-# Listar (paginado)
-curl "http://localhost:8080/api/urls?page=1&limit=20"
-
-# Eliminar
-curl -X DELETE http://localhost:8080/api/url/mi-link
+# Response: {"short_code":"Ab3XyZ","original_url":"...","created_at":"..."}
 ```
 
----
-
-## 📊 **Monitoreo: Prometheus + Grafana**
-
-### **Métricas expuestas (`/metrics`)**
-- `goshrt_urls_created_total` (contador)
-- `goshrt_redirect_duration_seconds` (histograma)
-- `goshrt_cache_hit_ratio` (promedio del ratio de hits en cache)
-
-### **Dashboard en Grafana**
-- **URLs Lean**: Gráfico de barras con URLs recientes
-- **Latencia P95**: Distribución de tiempos de redirección
-- **Ratio de Cache Hit**: Porcentaje de redirecciones servidas desde Redis
-
-Accede a Grafana en `http://localhost:3000` con usuario `admin` y contraseña `ysecreto123` (cambiable en producción).
-
----
-
-## 🧪 **Testing**
+### Redirección
 
 ```bash
-go test ./...
-go test -race ./...
-go test -coverprofile=coverage.out ./...
+curl -L http://localhost:8080/Ab3XyZ
+# → Redirecciona 301 a la URL original
 ```
 
-### **Makefile targets**
+### Más endpoints
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | /api/url | Crear URL corta |
+| GET | /api/urls?page=1&limit=20 | Listar URLs |
+| GET | /api/url/{shortCode}/stats | Stats de una URL |
+| DELETE | /api/url/{shortCode} | Eliminar URL |
+| GET | /health | Health check |
+| GET | /metrics | Métricas Prometheus |
+
+### Parámetros adicionales
+
 ```bash
-make test
-make lint
-make migrate-up
+# Con alias personalizado y TTL de 1 hora
+curl -X POST http://localhost:8080/api/url \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://ejemplo.com",
+    "custom_alias": "mi-link",
+    "ttl_seconds": 3600
+  }'
 ```
 
----
+## Dashboard Grafana
 
-## 🚢 **Deployment a Producción**
+Incluye dashboard pre-configurado con:
+- URLs activas, creadas y eliminadas
+- Tasa de redirecciones (cache hit vs miss)
+- Latencia de requests
+- Operaciones de caché (hit/miss/set)
+- Errores de base de datos
 
-### 🔐 Secrets
+## Variables de Entorno
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| PORT | 8080 | Puerto del servidor |
+| POSTGRES_DSN | postgres://goshrt:goshrt@localhost:5432/goshrt?sslmode=disable | DSN de PostgreSQL |
+| REDIS_ADDR | localhost:6379 | Dirección de Redis |
+| REDIS_PASSWORD | — | Password de Redis |
+| CLICK_SYNC_INTERVAL | 5s | Intervalo de sync de clics |
+
+## Desarrollo
+
 ```bash
-POSTGRES_PASSWORD=supersecreto123
-REDIS_PASSWORD=redis-secreto
-GF_SECURITY_ADMIN_PASSWORD=admin-seguro123
+make build      # Compilar
+make run        # Ejecutar
+make test       # Tests
+make docker     # Build imagen
 ```
 
-### ⚙️ `docker-compose.yml`
-```yaml
-services:
-  goshrt:
-    environment:
-      POSTGRES_DSN: "postgres://goshrt:${POSTGRES_PASSWORD}@postgres:5432/goshrt"
-      REDIS_PASSWORD: "${REDIS_PASSWORD}"
-    deploy:
-      replicas: 3
-```
+## Licencia
 
----
-
-## 🔒 **Seguridad**
-- **Rate limiting**: middleware `chi` + `tollbooth`
-- **Auth**: JWT en endpoints críticos
-- **Validación**: Sanitizar URLs
-- **CORS**: Solo orígenes permitidos
-
----
-
-## 📦 **Extensiones Futuras**
-- Dominios personalizados
-- Generador de QR codes
-- Dashboard de analytics avanzado
-- Webhooks
-- API Keys con rate limits
-
----
-
-## 🙏 **Agradecimientos**
-- **chi**: Router HTTP minimalista y rápido
-- **sqlx**: Extensiones de `database/sql`
-- **go-redis/v9**: Cliente Redis robusto
-- **prometheus/client_golang**: Métricas nativas
-- **grafana**: Dashboards visuales
-- **MaxMind GeoLite2**: Geolocalización (para Proxi-pulse)
-
----
-
-> **Hecho por https://www.quanticarch.com/** 🇻🇪
-
-**Tags:** `go` `url-shortener` `postgresql` `redis` `prometheus` `grafana` `docker` `observability` `clean-architecture` `golang`
+MIT
