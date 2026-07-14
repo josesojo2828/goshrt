@@ -27,7 +27,7 @@ services:
     image: prom/prometheus:latest
     container_name: goshrt_prometheus
     ports:
-      - "9090:9090"
+      - "15051:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
@@ -41,10 +41,10 @@ services:
     image: grafana/grafana:latest
     container_name: goshrt_grafana
     ports:
-      - "3000:3000"
+      - "15052:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ysecreto123
+      GF_SECURITY_ADMIN_PASSWORD: admin123
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ./grafana:/etc/grafana/provisioning
@@ -57,7 +57,7 @@ services:
     build: .
     container_name: goshrt_service
     ports:
-      - "8080:8080"
+      - "15050:8080"
     environment:
       PORT: "8080"
       POSTGRES_DSN: "postgres://goshrt:goshrt@postgres:5432/goshrt?sslmode=disable"
