@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -53,6 +51,22 @@ services:
     networks:
       - goshrt-network
 
+  migration:
+    image: migrate/migrate:v4.18.2
+    container_name: goshrt_migration
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://goshrt:goshrt@postgres:5432/goshrt?sslmode=disable"
+      - "up"
+    volumes:
+      - ./internal/store/postgres/migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - goshrt-network
+    restart: on-failure
+
   goshrt:
     build: .
     container_name: goshrt_service
@@ -63,8 +77,10 @@ services:
       POSTGRES_DSN: "postgres://goshrt:goshrt@postgres:5432/goshrt?sslmode=disable"
       REDIS_ADDR: "redis:6379"
     depends_on:
-      - postgres
-      - redis
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
     networks:
